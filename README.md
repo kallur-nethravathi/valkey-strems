@@ -1,1 +1,1 @@
-# valkey-strems
+# valkey-streams
