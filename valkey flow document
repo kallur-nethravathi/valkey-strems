@@ -1,0 +1,121 @@
+# Valkey Streams - Vessel Movement Tracking System
+
+## Overview
+This system implements a real-time vessel movement tracking system using Redis Streams (Valkey) as a message broker, with a producer-consumer pattern. The system reads vessel movement data from a CSV file, streams it through Redis, and persists it in MongoDB.
+
+## Architecture
+
+### Components
+1. **Producer** (`producer.js`)
+   - Reads vessel movement data from CSV
+   - Validates and transforms data
+   - Pushes data to Redis Stream
+
+2. **Consumer** (`consumer.js`)
+   - Reads from Redis Stream
+   - Processes and validates data
+   - Persists data to MongoDB
+
+3. **Valkey Client** (`valkeyClient.js`)
+   - Manages Redis connection
+   - Handles stream operations
+   - Provides shared configuration
+
+## Detailed Flow
+
+### 1. Data Flow
+```mermaid
+graph LR
+    A[CSV File] --> B[Producer]
+    B --> C[Redis Stream]
+    C --> D[Consumer]
+    D --> E[MongoDB]
+```
+
+### 2. Producer Flow (`producer.js`)
+1. **Initialization**
+   - Starts timing metrics
+   - Connects to Redis via `valkeyClient.js`
+   - Opens CSV file stream
+
+2. **Data Processing Loop**
+   - Reads CSV rows using `csv-parser`
+   - For each row:
+     - Validates required fields (MMSI, LAT, LON, SOG, BaseDateTime)
+     - Maps CSV fields to internal format:
+       ```javascript
+       {
+         vessel_id: MMSI,
+         lat: parseFloat(LAT),
+         long: parseFloat(LON),
+         speed: parseFloat(SOG),
+         timestamp: BaseDateTime
+       }
+       ```
+     - Validates numeric fields
+     - Calls `addVesselMovement()` to stream data
+
+3. **Streaming to Redis**
+   - Uses `XADD` command to add entries to stream
+   - Each entry contains:
+     - Auto-generated ID (`*`)
+     - Field-value pairs for vessel movement data
+   - Logs progress every 1000 records
+
+4. **Completion**
+   - Logs total records processed
+   - Calculates and logs duration metrics
+   - Closes Redis connection
+
+### 3. Consumer Flow (`consumer.js`)
+1. **Initialization**
+   - Starts timing metrics
+   - Connects to MongoDB
+   - Ensures consumer group exists via `ensureConsumerGroup()`
+
+2. **Stream Processing Loop**
+   - Uses `XREADGROUP` to read from stream:
+     ```javascript
+     valkey.xreadgroup(
+       "GROUP", GROUP_NAME, CONSUMER_NAME,
+       "BLOCK", 5000,  // 5-second timeout
+       "COUNT", 100,   // Batch size
+       "STREAMS", STREAM_KEY, ">"
+     )
+     ```
+   - For each entry:
+     - Validates required fields
+     - Transforms to MongoDB document
+     - Validates numeric fields
+     - Saves to MongoDB
+     - Acknowledges processing with `XACK`
+
+3. **Streaming Phase Tracking**
+   - Tracks if entries have been processed
+   - Marks streaming phase completion
+   - Logs duration metrics
+
+4. **Error Handling**
+   - Catches and logs errors
+   - Ensures proper cleanup of connections
+   - Logs total runtime metrics
+
+### 4. Valkey Client (`valkeyClient.js`)
+1. **Configuration**
+   ```javascript
+   const valkey = new Redis({
+     host: "localhost",
+     port: 6378,
+     password: "your-secure-password"
+   });
+   ```
+
+2. **Constants**
+   - `STREAM_KEY`: "vessel:movements:stream"
+   - `GROUP_NAME`: "vessel-group"
+   - `CONSUMER_NAME`: "consumer-1"
+
+3. **Key Functions**
+   - `ensureConsumerGroup()`: Creates consumer group if not exists
+   - `addVesselMovement()`: Adds movement data to stream using `XADD`
+.

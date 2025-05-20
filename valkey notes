@@ -1,0 +1,188 @@
+# Valkey (Redis Streams)
+
+## 1. Core Concepts
+
+### Streams
+- Streams are append-only data structures
+- Each entry has a unique ID (timestamp-based by default)
+- Entries consist of field-value pairs
+- Streams can grow indefinitely
+- Entries are immutable once added
+
+### Consumer Groups
+- Allow multiple consumers to read from the same stream
+- Each consumer group maintains its own "last delivered ID"
+- Messages can be processed by multiple groups
+- Within a group, each message is delivered to only one consumer
+- Groups provide message acknowledgment mechanism
+
+## 2. Key Commands
+
+### Stream Management
+```redis
+# Add entry to stream
+XADD mystream * field1 value1 field2 value2
+
+# Create consumer group
+XGROUP CREATE mystream mygroup 0 MKSTREAM
+
+# Read from stream (basic)
+XREAD COUNT 100 STREAMS mystream 0
+
+# Read from stream (consumer group)
+XREADGROUP GROUP mygroup consumer1 COUNT 100 BLOCK 5000 STREAMS mystream >
+```
+
+### Message Processing
+```redis
+# Acknowledge message
+XACK mystream mygroup message-id
+
+# Check pending messages
+XPENDING mystream mygroup
+
+# Claim pending messages
+XCLAIM mystream mygroup consumer2 5000 message-id
+```
+
+## 3. Important Concepts
+
+### Message IDs
+- Auto-generated using `*` (timestamp-based)
+- Format: `milliseconds-sequence`
+- Can be manually specified
+- Used for ordering and tracking
+
+### Consumer Group Features
+1. **Message Distribution**
+   - Round-robin distribution within group
+   - Each message goes to one consumer
+   - Consumers can process messages in parallel
+
+2. **Message Acknowledgment**
+   - Messages must be explicitly acknowledged
+   - Unacknowledged messages remain pending
+   - Can be claimed by other consumers if original consumer fails
+
+3. **Message History**
+   - Groups maintain delivery history
+   - Can track which messages were delivered to which consumer
+   - Helps in message recovery and debugging
+
+### Blocking Behavior
+- `BLOCK` parameter in `XREADGROUP`
+- Specifies milliseconds to wait for new messages
+- Returns immediately if messages are available
+- Returns empty if timeout occurs
+- Useful for real-time processing
+
+
+## 4. Performance Considerations
+
+### 1. Batch Processing
+- Use `COUNT` parameter to control batch size
+- Balance between latency and throughput
+- Typical batch sizes: 50-200 messages
+
+### 2. Blocking Timeouts
+- Short timeouts (1-5 seconds) for real-time systems
+- Longer timeouts for batch processing
+- Consider system resources and latency requirements
+
+### 3. Memory Management
+- Streams can grow large
+- Consider using `XTRIM` for older messages
+- Implement retention policies
+- Monitor stream length
+
+## 5. Common Use Cases
+
+### 1. Real-time Data Processing
+- Sensor data
+- Log processing
+- Event tracking
+- Vessel movements (as in your implementation)
+
+### 2. Message Queuing
+- Task distribution
+- Job processing
+- Event-driven architectures
+- Microservices communication
+
+### 3. Data Pipeline
+- ETL processes
+- Data transformation
+- Data aggregation
+- Real-time analytics
+
+## 6. Monitoring and Maintenance
+
+### 1. Key Metrics to Monitor
+- Stream length
+- Pending messages
+- Consumer lag
+- Processing time
+- Error rates
+
+### 2. Common Issues
+- Consumer failures
+- Message processing errors
+- Stream growth
+- Memory usage
+- Network latency
+
+### 3. Maintenance Tasks
+- Regular cleanup of old messages
+- Monitoring consumer health
+- Checking for stuck messages
+- Reviewing error logs
+- Performance optimization
+
+## 7. Security Considerations
+
+### 1. Access Control
+- Use Redis authentication
+- Implement proper password management
+- Restrict network access
+- Use SSL/TLS for connections
+
+### 2. Data Protection
+- Sensitive data encryption
+- Proper key naming
+- Data retention policies
+- Access logging
+
+## 8. Integration Patterns
+
+### 1. With Databases
+- Use as message queue for database operations
+- Implement write-behind caching
+- Handle database failures gracefully
+- Maintain data consistency
+
+### 2. With Microservices
+- Service communication
+- Event sourcing
+- Command query responsibility segregation (CQRS)
+- Distributed tracing
+
+## 9. Development Tips
+
+### 1. Testing
+- Use Redis mock for unit tests
+- Implement integration tests
+- Test consumer group behavior
+- Test error scenarios
+
+### 2. Debugging
+- Monitor stream contents
+- Check consumer group status
+- Review pending messages
+- Analyze processing patterns
+
+### 3. Development Workflow
+- Start with small streams
+- Implement proper error handling
+- Add monitoring early
+- Document consumer behavior
+- Implement proper logging

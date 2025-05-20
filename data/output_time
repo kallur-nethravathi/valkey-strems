@@ -1,0 +1,9 @@
+10000 Records streamd using valkey and saved into database
+
+data based saving:
+Streaming phase completed at: 2025-05-16T09:58:36.290Z
+Streaming phase took 1 minutes and 1 seconds
+
+
+processing time from producer:
+Streaming took 0 minutes and 34 seconds
